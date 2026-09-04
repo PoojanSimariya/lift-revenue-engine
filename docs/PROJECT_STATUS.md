@@ -8,7 +8,7 @@ Phase 0 — Repository Foundation
 
 Razorpay AI Buildathon 2026
 
-## Selected Track
+## Track
 
 Track 03 — AI Revenue Recovery
 
@@ -16,27 +16,56 @@ Track 03 — AI Revenue Recovery
 
 LIFT
 
+The name is provisional and may change after product identity review.
+
 ## Completed
 
-- [x] Local project directory created
+- [x] Local project workspace created
 - [x] Git repository initialized
 - [x] Default branch renamed to `main`
-- [x] Initial workspace directories created
-- [x] `.gitignore` created
+- [x] Initial repository structure created
+- [x] Initial `.gitignore` created
 - [x] Engineering guidelines created
-- [x] Project context created
 - [x] Initial README created
+- [x] Initial repository committed
+- [x] GitHub repository connected
+- [x] `main` pushed to GitHub
+- [x] Development branch created
+
+## Current Development Branch
+
+`feature/architecture-foundation`
 
 ## Current Gate
 
-Repository foundation.
+Repository foundation complete.
 
 ## Next Gate
 
-Product and architecture specification.
+Product definition and architecture specification.
 
-## Important
+## Implementation Status
 
-No major application implementation has started.
+Major application implementation has not started.
 
-Architecture must be reviewed before major implementation begins.
+## Immediate Objective
+
+Establish and review:
+
+- product requirements
+- product workflows
+- architecture
+- component boundaries
+- data model
+- AI boundaries
+- policy model
+- execution model
+- testing strategy
+- security model
+- evaluation methodology
+- deployment approach
+- implementation roadmap
+
+## Quality Rule
+
+No major implementation should begin until the architecture baseline has been reviewed and approved.

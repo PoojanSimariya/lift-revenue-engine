@@ -1,5 +1,9 @@
 # Project Context
 
+## Project
+
+Razorpay Buildathon Project
+
 ## Competition
 
 Razorpay AI Buildathon 2026
@@ -8,21 +12,15 @@ Razorpay AI Buildathon 2026
 
 Track 03 — AI Revenue Recovery
 
-## Working Product Name
+## Current Product Direction
 
-LIFT
+We are designing an intelligent revenue-recovery decisioning system.
 
-> Note: LIFT is an internal working name and is not yet the final public product identity.
+The central problem is not simply predicting whether a failed payment will recover.
 
-## Product Direction
+The system should determine which available intervention is expected to create the greatest incremental net recovery for a particular case while respecting:
 
-The project is being designed as an intelligent revenue-recovery decisioning system.
-
-The core problem is not simply predicting whether a failed payment will recover.
-
-The system should determine which available intervention is likely to produce the greatest incremental net recovery for a case while respecting:
-
-- latest payment state
+- latest verified payment state
 - merchant policy
 - customer-contact limits
 - intervention cost
@@ -32,6 +30,14 @@ The system should determine which available intervention is likely to produce th
 - idempotency
 - execution constraints
 
+## Working Product Name
+
+LIFT
+
+LIFT is an internal working name only.
+
+The final public product identity has not yet been finalized.
+
 ## Core Product Principle
 
 AI recommends.
@@ -40,22 +46,28 @@ Deterministic software decides.
 
 Bounded executors act.
 
-Verified payment evidence confirms.
+Verified payment evidence confirms the outcome.
 
 Important decisions are auditable.
 
-## Intended Differentiator
+## Intended Product Differentiation
 
-The product should focus on intervention economics and incremental recovery rather than being a generic payment-recovery chatbot.
+The project should not become a generic AI payment-recovery chatbot.
 
-The system should compare its strategy against meaningful baselines and measure incremental economic value.
+Its central differentiation should be decision quality and intervention economics.
 
-## Intended Capabilities
+The system should answer:
 
-The product direction currently includes:
+> Which intervention is most likely to create meaningful incremental recovery for this case, and is that intervention actually worth taking?
+
+The product should be able to compare its strategy against clear baseline strategies and measure incremental economic value.
+
+## Current Intended Capabilities
+
+These are provisional and will be finalized during architecture review:
 
 1. Revenue-at-risk detection
-2. Failure diagnosis
+2. Payment/failure diagnosis
 3. Recovery prediction
 4. Candidate intervention generation
 5. Intervention economics
@@ -71,8 +83,6 @@ The product direction currently includes:
 15. Razorpay webhook processing
 16. Human-review fallback
 17. AI uncertainty handling
-
-These capabilities are provisional until the architecture review is complete.
 
 ## AI Boundary
 
@@ -92,69 +102,134 @@ AI must not independently authorize:
 - monetary calculations
 - audit authority
 
+## Engineering Direction
+
+The project should favor:
+
+- explicit contracts
+- simple architecture
+- deterministic business logic where appropriate
+- strong validation
+- clear failure handling
+- testability
+- observability
+- maintainability
+- secure handling of external input
+- minimal unnecessary infrastructure
+
+Avoid:
+
+- unnecessary microservices
+- excessive agent frameworks
+- giant modules
+- hidden global state
+- business logic buried in prompts
+- generic AI-generated UI
+- direct unconstrained LLM-to-money execution
+
 ## Originality Requirement
 
-The final product must have its own:
+The project must have its own:
 
 - product identity
 - terminology
-- information architecture
 - visual language
 - interaction patterns
+- information architecture
 - decision model
 - documentation style
 - engineering structure
 
-The implementation must not copy another Buildathon submission's:
+We must not copy another Buildathon submission's:
 
-- name
+- project name
 - README wording
 - UI
 - architecture
 - diagrams
 - feature descriptions
 - branding
+- implementation structure
 
-The project should be independently reasoned and visibly distinct.
+Similarity to the underlying business problem is expected because we are solving the official Buildathon problem.
 
-## Development Tools
+The implementation and product experience must nevertheless be independently reasoned and visibly distinctive.
+
+## AI-Assisted Development Roles
 
 ### ChatGPT
 
-Project supervisor, product direction, architecture review, engineering review, QA strategy, tool coordination, prioritization, and final decision-making.
+Project supervisor and senior engineering reviewer.
+
+Responsibilities include:
+
+- product direction
+- architecture
+- sequencing
+- quality gates
+- security review
+- testing strategy
+- tool coordination
+- technical review
+- final quality control
 
 ### Antigravity
 
-Primary implementation environment for coding, documentation, testing, and development execution.
+Primary implementation environment.
+
+Responsibilities include:
+
+- repository implementation
+- coding
+- documentation
+- tests
+- local verification
+- refactoring
+- implementation artifacts
+
+Antigravity must not independently change architectural direction.
 
 ### Claude
 
-Reserved for high-value architectural, security, adversarial, large-scale code-review, and final quality-review tasks.
+High-value specialist reviewer.
 
-### Other tools
+Use selectively for:
 
-Other development or AI tools may be introduced when they provide a clear advantage for a specific task.
+- adversarial architecture review
+- security review
+- concurrency review
+- large-scale code review
+- reliability review
+- final production-readiness review
 
-## Current Stage
+Claude usage should be reserved for work where its deeper review provides meaningful additional value.
 
-Repository foundation.
+## Git Discipline
 
-No major application implementation has started.
+Do not independently:
 
-## Immediate Objective
+- change branches
+- merge branches
+- reset
+- rebase
+- cherry-pick
+- create commits
+- push changes
 
-Produce and review:
+unless explicitly instructed.
 
-- product requirements
-- system architecture
-- component boundaries
-- data model
-- AI boundaries
-- execution model
-- evaluation methodology
-- security model
-- testing strategy
-- deployment approach
-- implementation roadmap
+Keep commits focused and meaningful.
 
-Major implementation begins only after this architecture gate is approved.
+Avoid giant one-shot commits.
+
+## Current Phase
+
+Phase 0 — Repository Foundation
+
+## Current Objective
+
+Complete product definition and architecture specification before major implementation begins.
+
+## Current Implementation Status
+
+No application implementation has started.
