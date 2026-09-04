@@ -233,3 +233,49 @@ Complete product definition and architecture specification before major implemen
 ## Current Implementation Status
 
 No application implementation has started.
+
+---
+
+## Architecture Discovery Rules
+
+The architecture must be derived from the product problem rather than from a preferred technology stack.
+
+Technology selection should follow the simplest solution that can satisfy:
+
+- correctness
+- security
+- reliability
+- testability
+- measurable evaluation
+- maintainability
+- genuine Razorpay integration
+- clear AI boundaries
+
+The project is intentionally being designed against the current competitive landscape of Razorpay Buildathon submissions.
+
+Differentiation must therefore exist at the level of:
+
+- product reasoning
+- decision model
+- economic objective
+- user workflow
+- terminology
+- interaction model
+- evaluation methodology
+- engineering boundaries
+
+Cosmetic differentiation is insufficient.
+
+The architecture must not be copied or adapted from another Buildathon submission.
+
+The final architecture must remain understandable to an engineer who has not participated in the project's development.
+
+### Current working hypothesis
+
+The product is exploring revenue recovery as an intervention-decisioning problem rather than only a payment-failure prediction or automated outreach problem.
+
+The system should ultimately be capable of answering:
+
+> What is the best permitted intervention for this recovery opportunity, why is it better than the alternatives, what incremental value is expected, and what evidence confirms the final outcome?
+
+This is a hypothesis, not yet a frozen architecture decision.

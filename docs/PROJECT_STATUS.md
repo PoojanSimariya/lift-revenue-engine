@@ -38,34 +38,40 @@ The name is provisional and may change after product identity review.
 
 ## Current Gate
 
-Repository foundation complete.
-
-## Next Gate
-
-Product definition and architecture specification.
-
-## Implementation Status
-
-Major application implementation has not started.
+Product and Architecture Discovery
 
 ## Immediate Objective
 
-Establish and review:
+Develop a complete, reviewable product and architecture specification before major implementation begins.
 
-- product requirements
-- product workflows
-- architecture
-- component boundaries
+The specification must establish:
+
+- product boundaries
+- user workflows
+- domain concepts
+- terminology
+- system architecture
 - data model
-- AI boundaries
-- policy model
-- execution model
-- testing strategy
-- security model
+- AI responsibilities
+- deterministic decision boundaries
+- execution boundaries
+- Razorpay integration strategy
+- simulation strategy
 - evaluation methodology
+- security model
+- failure model
+- observability strategy
 - deployment approach
-- implementation roadmap
+- implementation sequence
+
+## Architecture Status
+
+Not yet approved.
+
+## Implementation Status
+
+No major application implementation has started.
 
 ## Quality Rule
 
-No major implementation should begin until the architecture baseline has been reviewed and approved.
+Architecture must be reviewed independently before implementation begins.
