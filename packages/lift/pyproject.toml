@@ -9,6 +9,8 @@ description = "LIFT — Revenue Recovery Engine Core"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7.0",
+    "sqlalchemy>=2.0.30",
+    "alembic>=1.13.0",
 ]
 
 [tool.setuptools.packages.find]

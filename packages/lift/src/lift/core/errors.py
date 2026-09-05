@@ -80,3 +80,18 @@ class TimeZoneError(LiftError):
     def __init__(self, timezone_str: str, message: str = "Invalid or unsupported timezone") -> None:
         msg = f"{message}: '{timezone_str}'"
         super().__init__(msg, {"timezone": timezone_str})
+
+
+class DatabaseConfigurationError(LiftError):
+    """Raised when database connection settings or environment guardrails are violated."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class RecordNotFoundError(LiftError):
+    """Raised when a requested database record cannot be found."""
+
+    def __init__(self, entity_name: str, identifier: Any) -> None:
+        msg = f"{entity_name} not found with identifier: '{identifier}'"
+        super().__init__(msg, {"entity_name": entity_name, "identifier": identifier})

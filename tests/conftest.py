@@ -4,7 +4,7 @@ import secrets
 from datetime import datetime, timezone
 
 import pytest
-from lift.core.types import FailureCategory, OpportunityState, PaymentMethod
+from lift.core.types import AttemptStatus, FailureCategory, OpportunityState, PaymentMethod
 from lift.domain.models import Customer, Merchant, PaymentAttempt, RecoveryOpportunity
 
 
@@ -46,7 +46,7 @@ def sample_attempt(sample_customer: Customer) -> PaymentAttempt:
         amount_subunits=450000,  # 4,500.00 INR
         currency="INR",
         payment_method=PaymentMethod.CARD,
-        status="failed",
+        status=AttemptStatus.FAILED,
         error_code="BAD_REQUEST_ERROR",
         error_description="Payment authentication timed out",
         error_source="bank",
