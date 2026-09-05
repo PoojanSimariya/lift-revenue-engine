@@ -9,6 +9,7 @@ from lift.storage.repositories.evidence import PaymentEvidenceRepository
 from lift.storage.repositories.merchant import MerchantRepository
 from lift.storage.repositories.opportunity import OpportunityRepository
 from lift.storage.repositories.policy import PolicyRuleRepository
+from lift.storage.repositories.task import TaskQueueRepository
 from lift.storage.repositories.voucher import ExecutionRecordRepository
 from lift.storage.repositories.webhook import WebhookEventRepository
 
@@ -24,5 +25,6 @@ __all__ = [
     "PaymentAttemptRepository",
     "PaymentEvidenceRepository",
     "PolicyRuleRepository",
+    "TaskQueueRepository",
     "WebhookEventRepository",
 ]

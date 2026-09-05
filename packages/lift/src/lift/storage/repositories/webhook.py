@@ -50,6 +50,41 @@ class WebhookEventRepository(BaseRepository):
 
         return orm
 
+    def record_event_if_absent(
+        self,
+        event_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+    ) -> tuple[bool, WebhookEventORM]:
+        """Atomically record an incoming webhook event if absent.
+
+        Returns:
+            tuple[bool, WebhookEventORM]:
+                (True, new_orm) if the event was inserted.
+                (False, existing_orm) if the event already existed (duplicate delivery).
+        """
+        existing = self.get_by_event_id(event_id)
+        if existing is not None:
+            return False, existing
+
+        orm = WebhookEventORM(
+            event_id=event_id,
+            event_type=event_type,
+            payload=payload,
+            status="PENDING",
+            received_at=utc_now(),
+        )
+        try:
+            with self.session.begin_nested():
+                self.session.add(orm)
+                self.session.flush()
+            return True, orm
+        except IntegrityError:
+            existing = self.get_by_event_id(event_id)
+            if existing is not None:
+                return False, existing
+            raise
+
     def mark_processed(self, event_id: str) -> WebhookEventORM:
         """Mark a webhook event as successfully processed."""
         orm = self.get_by_event_id(event_id)
@@ -60,3 +95,4 @@ class WebhookEventRepository(BaseRepository):
         orm.processed_at = utc_now()
         self.session.flush()
         return orm
+

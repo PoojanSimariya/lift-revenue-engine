@@ -34,6 +34,14 @@ class ExecutionRecordRepository(BaseRepository):
         orm = self.session.scalar(stmt)
         return to_execution_record_domain(orm) if orm else None
 
+    def get_by_external_reference_id(self, external_reference_id: str) -> ExecutionRecord | None:
+        stmt = select(ExecutionRecordORM).where(
+            ExecutionRecordORM.external_reference_id == external_reference_id
+        )
+        orm = self.session.scalar(stmt)
+        return to_execution_record_domain(orm) if orm else None
+
+
     def create_voucher(self, record: ExecutionRecord) -> ExecutionRecord:
         """Create a new execution voucher.
 

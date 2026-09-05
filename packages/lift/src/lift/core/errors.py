@@ -95,3 +95,46 @@ class RecordNotFoundError(LiftError):
     def __init__(self, entity_name: str, identifier: Any) -> None:
         msg = f"{entity_name} not found with identifier: '{identifier}'"
         super().__init__(msg, {"entity_name": entity_name, "identifier": identifier})
+
+
+class MissingHeaderError(LiftError):
+    """Raised when a required HTTP header (e.g. x-razorpay-event-id) is missing."""
+
+    def __init__(self, header_name: str) -> None:
+        super().__init__(f"Missing required header: '{header_name}'", {"header_name": header_name})
+
+
+class InvalidSignatureError(LiftError):
+    """Raised when webhook signature verification fails."""
+
+    def __init__(self, message: str = "Invalid webhook signature") -> None:
+        super().__init__(message)
+
+
+class GatewayError(LiftError):
+    """Base exception for payment gateway integration failures."""
+
+    def __init__(
+        self,
+        message: str,
+        gateway_code: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        payload = details or {}
+        if gateway_code:
+            payload["gateway_code"] = gateway_code
+        super().__init__(message, payload)
+        self.gateway_code = gateway_code
+
+
+class GatewayTimeoutError(GatewayError):
+    """Raised when a gateway network request times out."""
+
+
+class GatewayResourceNotFoundError(GatewayError):
+    """Raised when a gateway entity (e.g. payment link, payment, order) is not found (HTTP 404)."""
+
+
+class GatewayAuthenticationError(GatewayError):
+    """Raised when gateway credentials/API keys are invalid (HTTP 401)."""
+

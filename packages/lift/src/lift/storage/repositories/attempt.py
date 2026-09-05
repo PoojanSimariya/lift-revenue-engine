@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -59,3 +60,40 @@ class PaymentAttemptRepository(BaseRepository):
         orm.raw_payload = attempt.raw_payload
         self.session.flush()
         return to_attempt_domain(orm)
+
+    def update_status_monotonic(
+        self,
+        attempt_id: UUID,
+        new_status: str,
+        error_code: str | None = None,
+        error_description: str | None = None,
+        raw_payload: dict[str, Any] | None = None,
+    ) -> PaymentAttempt:
+        """Update payment attempt status monotonically.
+
+        Monotonic hierarchy: failed -> authorized -> captured.
+        Status never regresses (e.g. captured never reverts to authorized or failed).
+        """
+        stmt = select(PaymentAttemptORM).where(PaymentAttemptORM.id == attempt_id)
+        orm = self.session.scalar(stmt)
+        if not orm:
+            raise RecordNotFoundError("PaymentAttempt", attempt_id)
+
+        rank_map = {"failed": 1, "authorized": 2, "captured": 3}
+        current_rank = rank_map.get(orm.status.lower(), 0)
+        new_rank = rank_map.get(new_status.lower(), 0)
+
+        # Monotonic advance only
+        if new_rank > current_rank:
+            orm.status = new_status.lower()
+
+        if error_code is not None:
+            orm.error_code = error_code
+        if error_description is not None:
+            orm.error_description = error_description
+        if raw_payload is not None:
+            orm.raw_payload = raw_payload
+
+        self.session.flush()
+        return to_attempt_domain(orm)
+

@@ -72,6 +72,13 @@ class OpportunityRepository(BaseRepository):
         orm = self.session.scalar(stmt)
         return to_opportunity_domain(orm) if orm else None
 
+    def find_by_order_id(self, order_id: str) -> RecoveryOpportunity | None:
+        """Find opportunity by order_id across any merchant."""
+        stmt = select(RecoveryOpportunityORM).where(RecoveryOpportunityORM.order_id == order_id)
+        orm = self.session.scalar(stmt)
+        return to_opportunity_domain(orm) if orm else None
+
+
     def update(self, opportunity: RecoveryOpportunity) -> RecoveryOpportunity:
         stmt = select(RecoveryOpportunityORM).where(RecoveryOpportunityORM.id == opportunity.id)
         orm = self.session.scalar(stmt)

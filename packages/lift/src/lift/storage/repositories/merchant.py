@@ -20,8 +20,15 @@ class MerchantRepository(BaseRepository):
         orm = self.session.scalar(stmt)
         return to_merchant_domain(orm) if orm else None
 
+    def get_first(self) -> Merchant | None:
+        """Fetch the first/default merchant in the database."""
+        stmt = select(MerchantORM).limit(1)
+        orm = self.session.scalar(stmt)
+        return to_merchant_domain(orm) if orm else None
+
     def create(self, merchant: Merchant) -> Merchant:
         orm = to_merchant_orm(merchant)
         self.session.add(orm)
         self.session.flush()
         return to_merchant_domain(orm)
+

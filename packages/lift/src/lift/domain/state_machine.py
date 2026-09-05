@@ -197,12 +197,14 @@ class OpportunityStateMachine:
         cls,
         opportunity: RecoveryOpportunity,
         event_name: str = "payment.failed",
+        increment_attempt_count: bool = True,
     ) -> TransitionResult:
         """Handle payment failure event.
 
         CRITICAL INVARIANT:
         If opportunity is already RECOVERED, late failure events must NOT mutate state.
         Produces STALE_FAILURE_SUPPRESSED result without raising an error.
+        Failure count increments ONLY when increment_attempt_count is True (new attempt).
         """
         previous_state = opportunity.current_state
 
@@ -226,7 +228,8 @@ class OpportunityStateMachine:
                 message=f"Failure ignored on terminal state {previous_state.value}.",
             )
 
-        opportunity.failure_attempt_count += 1
+        if increment_attempt_count:
+            opportunity.failure_attempt_count += 1
 
         if previous_state == OpportunityState.ACTION_BLOCKED:
             cls.transition(
@@ -249,7 +252,103 @@ class OpportunityStateMachine:
             transitioned=False,
             event_name=event_name,
             suppressed=False,
-            message="Payment failure recorded; failure count incremented.",
+            message="Payment failure recorded.",
+        )
+
+    @classmethod
+    def handle_payment_authorized(
+        cls,
+        opportunity: RecoveryOpportunity,
+        event_name: str = "payment.authorized",
+    ) -> TransitionResult:
+        """Handle payment authorization event.
+
+        Preserves or sets AWAITING_SETTLEMENT. Does NOT mark RECOVERED on authorization alone.
+        Suppresses when already in RECOVERED terminal sink.
+        """
+        previous_state = opportunity.current_state
+
+        if previous_state == OpportunityState.RECOVERED:
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name="STALE_AUTH_SUPPRESSED",
+                suppressed=True,
+                message="Payment authorization suppressed on RECOVERED opportunity.",
+            )
+
+        if cls.is_terminal(previous_state):
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name="TERMINAL_EVENT_IGNORED",
+                suppressed=True,
+                message=f"Authorization ignored on terminal state {previous_state.value}.",
+            )
+
+        if previous_state == OpportunityState.AWAITING_SETTLEMENT:
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name=event_name,
+                suppressed=False,
+                message="Payment authorized while already in AWAITING_SETTLEMENT.",
+            )
+
+        opportunity.current_state = OpportunityState.AWAITING_SETTLEMENT
+        opportunity.version += 1
+        return TransitionResult(
+            previous_state=previous_state,
+            current_state=OpportunityState.AWAITING_SETTLEMENT,
+            transitioned=True,
+            event_name=event_name,
+            suppressed=False,
+            message="Opportunity transitioned to AWAITING_SETTLEMENT on authorization.",
+        )
+
+    @classmethod
+    def handle_payment_link_partially_paid(
+        cls,
+        opportunity: RecoveryOpportunity,
+        event_name: str = "payment_link.partially_paid",
+    ) -> TransitionResult:
+        """Handle partial payment on payment link.
+
+        Records evidence but does NOT transition to RECOVERED (amount at risk not fully settled).
+        Suppresses when already permanently RECOVERED.
+        """
+        previous_state = opportunity.current_state
+
+        if previous_state == OpportunityState.RECOVERED:
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name="STALE_PARTIAL_PAID_SUPPRESSED",
+                suppressed=True,
+                message="Partial payment event suppressed on permanently RECOVERED opportunity.",
+            )
+
+        if cls.is_terminal(previous_state):
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name="TERMINAL_EVENT_IGNORED",
+                suppressed=True,
+                message=f"Partial payment ignored on terminal state {previous_state.value}.",
+            )
+
+        return TransitionResult(
+            previous_state=previous_state,
+            current_state=previous_state,
+            transitioned=False,
+            event_name=event_name,
+            suppressed=False,
+            message="Partial payment recorded; opportunity remains non-terminal.",
         )
 
     @classmethod
