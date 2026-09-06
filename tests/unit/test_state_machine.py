@@ -166,3 +166,61 @@ def test_state_machine_link_expired_scenarios(sample_opportunity: RecoveryOpport
         opp_open, retry_budget_remaining=True
     )
     assert not res_open.transitioned
+
+
+def test_state_machine_payment_authorized_invariants(
+    sample_opportunity: RecoveryOpportunity,
+) -> None:
+    opp = sample_opportunity
+    assert opp.current_state == OpportunityState.OPEN
+
+    # 1. Authorized from OPEN: suppressed, does not transition, does NOT set RECOVERED
+    res_open = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert not res_open.transitioned
+    assert res_open.suppressed
+    assert opp.current_state == OpportunityState.OPEN
+    assert opp.current_state != OpportunityState.RECOVERED
+
+    # 2. Authorized from IN_EVALUATION: suppressed, does not transition, does NOT set RECOVERED
+    OpportunityStateMachine.transition(opp, OpportunityState.IN_EVALUATION)
+    assert opp.current_state == OpportunityState.IN_EVALUATION
+    res_eval = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert not res_eval.transitioned
+    assert res_eval.suppressed
+    assert opp.current_state == OpportunityState.IN_EVALUATION
+    assert opp.current_state != OpportunityState.RECOVERED
+
+    # 3. Out-of-order authorized from ACTION_SCHEDULED: suppressed, does not transition
+    OpportunityStateMachine.transition(opp, OpportunityState.ACTION_SCHEDULED)
+    assert opp.current_state == OpportunityState.ACTION_SCHEDULED
+    res_sched = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert not res_sched.transitioned
+    assert res_sched.suppressed
+    assert opp.current_state == OpportunityState.ACTION_SCHEDULED
+
+    # 4. Authorized from expected valid state (ACTION_EXECUTING): transitions to AWAITING_SETTLEMENT
+    OpportunityStateMachine.transition(opp, OpportunityState.ACTION_EXECUTING)
+    assert opp.current_state == OpportunityState.ACTION_EXECUTING
+    res_exec = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert res_exec.transitioned
+    assert not res_exec.suppressed
+    assert opp.current_state == OpportunityState.AWAITING_SETTLEMENT
+    assert opp.current_state != OpportunityState.RECOVERED
+
+    # 5. Duplicate authorized event in AWAITING_SETTLEMENT: acknowledged, no transition
+    res_dup = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert not res_dup.transitioned
+    assert not res_dup.suppressed
+    assert opp.current_state == OpportunityState.AWAITING_SETTLEMENT
+    assert opp.current_state != OpportunityState.RECOVERED
+
+    # 6. Capture transitions to RECOVERED (monotonic terminal sink)
+    OpportunityStateMachine.handle_payment_captured(opp)
+    assert opp.current_state == OpportunityState.RECOVERED
+
+    # 7. Authorized after RECOVERED: suppressed, stays RECOVERED
+    res_post_rec = OpportunityStateMachine.handle_payment_authorized(opp)
+    assert not res_post_rec.transitioned
+    assert res_post_rec.suppressed
+    assert res_post_rec.event_name == "STALE_AUTH_SUPPRESSED"
+    assert opp.current_state == OpportunityState.RECOVERED

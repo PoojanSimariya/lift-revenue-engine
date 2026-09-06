@@ -78,7 +78,6 @@ class OpportunityRepository(BaseRepository):
         orm = self.session.scalar(stmt)
         return to_opportunity_domain(orm) if orm else None
 
-
     def update(self, opportunity: RecoveryOpportunity) -> RecoveryOpportunity:
         stmt = select(RecoveryOpportunityORM).where(RecoveryOpportunityORM.id == opportunity.id)
         orm = self.session.scalar(stmt)
@@ -118,3 +117,31 @@ class OpportunityRepository(BaseRepository):
         self.session.flush()
 
         return to_opportunity_domain(opp_orm), to_attempt_domain(attempt_orm)
+
+    def lock_for_update(self, opportunity_id: UUID) -> RecoveryOpportunityORM | None:
+        """Pessimistically lock and fetch a recovery opportunity by ID."""
+        bind = self.session.get_bind()
+        stmt = select(RecoveryOpportunityORM).where(RecoveryOpportunityORM.id == opportunity_id)
+        if not (bind and bind.dialect.name == "sqlite"):
+            stmt = stmt.with_for_update()
+        return self.session.scalar(stmt)
+
+    def find_stuck_executing(self, timeout_seconds: int = 90) -> list[RecoveryOpportunityORM]:
+        """Find opportunities stuck in ACTION_EXECUTING where execution_claimed_at
+
+        exceeds timeout.
+        """
+        from datetime import timedelta
+
+        from lift.storage.base import utc_now
+
+        cutoff = utc_now() - timedelta(seconds=timeout_seconds)
+        stmt = (
+            select(RecoveryOpportunityORM)
+            .where(
+                RecoveryOpportunityORM.current_state == "ACTION_EXECUTING",
+                RecoveryOpportunityORM.execution_claimed_at <= cutoff,
+            )
+            .order_by(RecoveryOpportunityORM.execution_claimed_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())

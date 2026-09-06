@@ -155,3 +155,32 @@ def test_health_check_endpoint(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_router_internal_error_does_not_leak_exception_details(client, monkeypatch):
+    """Assert HTTP 500 returns generic external error without leaking internal exception strings."""
+    from lift.webhooks.service import WebhookIngestionService
+
+    secret_leak_msg = "Database deadlocks at postgresql://user:secretpass@db/prod"
+
+    def mock_process_webhook(*args, **kwargs):
+        raise RuntimeError(secret_leak_msg)
+
+    monkeypatch.setattr(WebhookIngestionService, "process_webhook", mock_process_webhook)
+
+    raw = b'{"event": "payment.failed"}'
+    sig = hmac.new(SECRET.encode("utf-8"), raw, hashlib.sha256).hexdigest()
+
+    resp = client.post(
+        "/api/v1/webhooks/razorpay",
+        headers={
+            "x-razorpay-event-id": "evt_crash_500",
+            "x-razorpay-signature": sig,
+        },
+        content=raw,
+    )
+    assert resp.status_code == 500
+    data = resp.json()
+    assert data == {"error": "internal_error"}
+    assert "message" not in data
+    assert secret_leak_msg not in resp.text

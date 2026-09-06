@@ -41,7 +41,6 @@ class ExecutionRecordRepository(BaseRepository):
         orm = self.session.scalar(stmt)
         return to_execution_record_domain(orm) if orm else None
 
-
     def create_voucher(self, record: ExecutionRecord) -> ExecutionRecord:
         """Create a new execution voucher.
 
@@ -74,3 +73,29 @@ class ExecutionRecordRepository(BaseRepository):
         orm.executed_at = record.executed_at
         self.session.flush()
         return to_execution_record_domain(orm)
+
+    def get_by_task_id(self, task_id: UUID) -> ExecutionRecord | None:
+        """Fetch execution record linked to a specific background task."""
+        stmt = select(ExecutionRecordORM).where(ExecutionRecordORM.task_id == task_id)
+        orm = self.session.scalar(stmt)
+        return to_execution_record_domain(orm) if orm else None
+
+    def get_by_id_orm(self, record_id: UUID) -> ExecutionRecordORM | None:
+        """Fetch raw ORM record for in-transaction updates."""
+        stmt = select(ExecutionRecordORM).where(ExecutionRecordORM.id == record_id)
+        return self.session.scalar(stmt)
+
+    def get_active_for_opportunity(self, opportunity_id: UUID) -> list[ExecutionRecord]:
+        """Fetch all CLAIMED or EXECUTED vouchers for an opportunity."""
+        from lift.storage.orm_models import RecoveryDecisionORM
+
+        stmt = (
+            select(ExecutionRecordORM)
+            .join(RecoveryDecisionORM, ExecutionRecordORM.decision_id == RecoveryDecisionORM.id)
+            .where(
+                RecoveryDecisionORM.opportunity_id == opportunity_id,
+                ExecutionRecordORM.execution_status.in_(["CLAIMED", "EXECUTED"]),
+            )
+            .order_by(ExecutionRecordORM.claimed_at.desc())
+        )
+        return [to_execution_record_domain(orm) for orm in self.session.scalars(stmt).all()]

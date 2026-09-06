@@ -31,4 +31,3 @@ class MerchantRepository(BaseRepository):
         self.session.add(orm)
         self.session.flush()
         return to_merchant_domain(orm)
-

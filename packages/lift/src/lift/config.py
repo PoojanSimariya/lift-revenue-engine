@@ -36,4 +36,3 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return application settings loaded from current environment."""
     return Settings()
-

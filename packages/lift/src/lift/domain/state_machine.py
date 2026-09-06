@@ -298,8 +298,21 @@ class OpportunityStateMachine:
                 message="Payment authorized while already in AWAITING_SETTLEMENT.",
             )
 
-        opportunity.current_state = OpportunityState.AWAITING_SETTLEMENT
-        opportunity.version += 1
+        if not cls.can_transition(previous_state, OpportunityState.AWAITING_SETTLEMENT):
+            return TransitionResult(
+                previous_state=previous_state,
+                current_state=previous_state,
+                transitioned=False,
+                event_name="UNSUPPORTED_AUTH_TRANSITION_SUPPRESSED",
+                suppressed=True,
+                message=f"Cannot transition to AWAITING_SETTLEMENT from {previous_state.value}.",
+            )
+
+        cls.transition(
+            opportunity,
+            OpportunityState.AWAITING_SETTLEMENT,
+            reason=f"Payment authorized via {event_name}",
+        )
         return TransitionResult(
             previous_state=previous_state,
             current_state=OpportunityState.AWAITING_SETTLEMENT,

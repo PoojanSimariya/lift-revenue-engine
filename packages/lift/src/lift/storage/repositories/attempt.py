@@ -96,4 +96,3 @@ class PaymentAttemptRepository(BaseRepository):
 
         self.session.flush()
         return to_attempt_domain(orm)
-

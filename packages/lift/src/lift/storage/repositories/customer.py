@@ -50,3 +50,54 @@ class CustomerRepository(BaseRepository):
         orm.last_contacted_at = customer.last_contacted_at
         self.session.flush()
         return to_customer_domain(orm)
+
+    def lock_for_update(self, customer_id: UUID) -> CustomerORM | None:
+        """Pessimistically lock and fetch a customer record by ID."""
+        bind = self.session.get_bind()
+        stmt = select(CustomerORM).where(CustomerORM.id == customer_id)
+        if not (bind and bind.dialect.name == "sqlite"):
+            stmt = stmt.with_for_update()
+        return self.session.scalar(stmt)
+
+    def count_active_contacts_7d(self, customer_id: UUID) -> int:
+        """Derive active rolling 7-day contacts from immutable execution records.
+
+        Conservative Reservation:
+        Counts records in ('CLAIMED', 'EXECUTED') for customer outreach interventions.
+        """
+        from datetime import timedelta
+
+        from sqlalchemy import func
+
+        from lift.core.types import InterventionType
+        from lift.storage.base import utc_now
+        from lift.storage.orm_models import (
+            ExecutionRecordORM,
+            RecoveryDecisionORM,
+            RecoveryOpportunityORM,
+        )
+
+        cutoff = utc_now() - timedelta(days=7)
+        outreach_types = [
+            InterventionType.DIRECT_PAYMENT_LINK_SMS.value,
+            InterventionType.DIRECT_PAYMENT_LINK_WHATSAPP.value,
+            InterventionType.DIRECT_PAYMENT_LINK_EMAIL.value,
+            InterventionType.CUSTOM_WEBHOOK_OUTREACH.value,
+        ]
+
+        stmt = (
+            select(func.count(ExecutionRecordORM.id))
+            .join(RecoveryDecisionORM, ExecutionRecordORM.decision_id == RecoveryDecisionORM.id)
+            .join(
+                RecoveryOpportunityORM,
+                RecoveryDecisionORM.opportunity_id == RecoveryOpportunityORM.id,
+            )
+            .where(
+                RecoveryOpportunityORM.customer_id == customer_id,
+                ExecutionRecordORM.claimed_at >= cutoff,
+                ExecutionRecordORM.execution_status.in_(["CLAIMED", "EXECUTED"]),
+                ExecutionRecordORM.intervention_type.in_(outreach_types),
+            )
+        )
+        count = self.session.scalar(stmt)
+        return int(count or 0)

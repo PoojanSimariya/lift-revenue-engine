@@ -179,23 +179,51 @@ class RazorpayTestModeAdapter(PaymentGatewayAdapter):
     def fetch_payment_link_by_reference_id(self, reference_id: str) -> PaymentLinkStatus | None:
         """Discover an existing Payment Link using the deterministic reference_id."""
         data = self._request("GET", "/payment_links", params={"reference_id": reference_id})
-        items = data.get("payment_links") if isinstance(data, dict) else None
-        if not items and isinstance(data, list):
+        if not isinstance(data, dict):
+            raise GatewayError(
+                f"Unexpected response format from Razorpay payment_links API: {type(data)}",
+                gateway_code="MALFORMED_RESPONSE",
+                details={"response": data},
+            )
+        # Razorpay Payment Link collection response:
+        # {"entity": "collection", "count": 1, "items": [...]}
+        items = data.get("items")
+        if items is None and "payment_links" in data:
+            items = data.get("payment_links")
+        if items is None and isinstance(data, list):
             items = data
-        if not items:
+
+        if not isinstance(items, list):
+            raise GatewayError(
+                "Malformed response: 'items' collection is missing or invalid",
+                gateway_code="MALFORMED_RESPONSE",
+                details={"response": data},
+            )
+        if len(items) == 0:
             return None
+
         match = items[0]
+        if not isinstance(match, dict) or "id" not in match:
+            raise GatewayError(
+                "Malformed item in payment link collection response",
+                gateway_code="MALFORMED_RESPONSE",
+                details={"item": match},
+            )
+
+        ref_id_val = str(match["reference_id"]) if match.get("reference_id") is not None else None
+        canc_at_val = int(match["cancelled_at"]) if match.get("cancelled_at") is not None else None
+
         return PaymentLinkStatus(
-            id=match["id"],
-            status=match.get("status", "created"),
-            amount=match.get("amount", 0),
-            currency=match.get("currency", "INR"),
-            amount_paid=match.get("amount_paid", 0),
-            reference_id=match.get("reference_id"),
-            short_url=match.get("short_url"),
-            expired_at=match.get("expired_at"),
-            cancelled_at=match.get("cancelled_at"),
-            notes=match.get("notes", {}),
+            id=str(match["id"]),
+            status=str(match.get("status", "created")),
+            amount=int(match.get("amount", 0)),
+            currency=str(match.get("currency", "INR")),
+            amount_paid=int(match.get("amount_paid", 0)),
+            reference_id=ref_id_val,
+            short_url=str(match["short_url"]) if match.get("short_url") is not None else None,
+            expired_at=int(match["expired_at"]) if match.get("expired_at") is not None else None,
+            cancelled_at=canc_at_val,
+            notes=match.get("notes", {}) if isinstance(match.get("notes"), dict) else {},
         )
 
     def cancel_payment_link(self, payment_link_id: str) -> bool:

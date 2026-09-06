@@ -30,6 +30,7 @@ from lift.storage.orm_models import TaskQueueORM
 from lift.storage.repositories import (
     OpportunityRepository,
     PaymentAttemptRepository,
+    PaymentEvidenceRepository,
 )
 from lift.webhooks.reference import generate_reference_id
 from lift.webhooks.service import WebhookIngestionService
@@ -264,7 +265,35 @@ def test_payment_captured_enqueues_cancellation_task(session):
 def test_payment_authorized_does_not_recover(session):
     """Verify payment.authorized moves to AWAITING_SETTLEMENT, not RECOVERED."""
     service = WebhookIngestionService(session, SECRET)
+    merchant, customer = service._get_or_create_default_context()
     opp_repo = OpportunityRepository(session)
+
+    # Opportunity in expected valid state: ACTION_EXECUTING
+    opp_repo.create_with_initial_attempt(
+        RecoveryOpportunity(
+            merchant_id=merchant.id,
+            customer_id=customer.id,
+            order_id="order_auth_only",
+            initial_attempt_id=uuid.uuid4(),
+            latest_attempt_id=uuid.uuid4(),
+            amount_at_risk_subunits=50000,
+            currency="INR",
+            current_state=OpportunityState.ACTION_EXECUTING,
+            failure_category=FailureCategory.TRANSIENT_NETWORK,
+            organic_recovery_estimate=0.25,
+            failure_attempt_count=1,
+        ),
+        DomainAttempt(
+            customer_id=customer.id,
+            recovery_opportunity_id=None,
+            razorpay_payment_id="pay_auth_prev",
+            razorpay_order_id="order_auth_only",
+            amount_subunits=50000,
+            payment_method=PaymentMethod.CARD,
+            status=AttemptStatus.FAILED,
+            gateway_created_at=datetime.now(timezone.utc),
+        ),
+    )[0]
 
     raw, sig = make_payload(
         "payment.authorized",
@@ -272,8 +301,10 @@ def test_payment_authorized_does_not_recover(session):
     )
     service.process_webhook("evt_auth_only", sig, raw)
 
-    opp = opp_repo.find_by_order_id("order_auth_only")
-    assert opp.current_state == OpportunityState.AWAITING_SETTLEMENT
+    opp_after = opp_repo.find_by_order_id("order_auth_only")
+    assert opp_after is not None
+    assert opp_after.current_state == OpportunityState.AWAITING_SETTLEMENT
+    assert opp_after.current_state != OpportunityState.RECOVERED
 
 
 def test_payment_link_paid_correlates_from_local_mapping(session):
@@ -456,3 +487,111 @@ def test_payment_link_partially_paid(session):
     opp_after = opp_repo.get_by_id(opp.id)
     # MUST NOT be RECOVERED
     assert opp_after.current_state != OpportunityState.RECOVERED
+
+
+def test_webhook_customer_context_resolution_and_isolation(session):
+    """Verify customer context derivation, collision prevention, and unresolved isolation."""
+    service = WebhookIngestionService(session, SECRET)
+    opp_repo = OpportunityRepository(session)
+
+    # 1. Resolvable customer A (by customer_id)
+    raw1, sig1 = make_payload(
+        "payment.failed",
+        {
+            "id": "pay_cust_a_1",
+            "order_id": "order_cust_a_1",
+            "amount": 20000,
+            "customer_id": "cust_rzp_alpha",
+        },
+    )
+    res1 = service.process_webhook("evt_cust_a_1", sig1, raw1)
+    assert res1.status == "accepted"
+    opp1 = opp_repo.find_by_order_id("order_cust_a_1")
+    assert opp1 is not None
+
+    # 2. Same resolvable customer A in another payment resolves to SAME customer
+    raw2, sig2 = make_payload(
+        "payment.failed",
+        {
+            "id": "pay_cust_a_2",
+            "order_id": "order_cust_a_2",
+            "amount": 30000,
+            "customer_id": "cust_rzp_alpha",
+        },
+    )
+    res2 = service.process_webhook("evt_cust_a_2", sig2, raw2)
+    assert res2.status == "accepted"
+    opp2 = opp_repo.find_by_order_id("order_cust_a_2")
+    assert opp2 is not None
+    assert opp1.customer_id == opp2.customer_id
+
+    # 3. Different resolvable customer B does NOT collide with customer A
+    raw3, sig3 = make_payload(
+        "payment.failed",
+        {
+            "id": "pay_cust_b_1",
+            "order_id": "order_cust_b_1",
+            "amount": 40000,
+            "customer_id": "cust_rzp_beta",
+        },
+    )
+    res3 = service.process_webhook("evt_cust_b_1", sig3, raw3)
+    assert res3.status == "accepted"
+    opp3 = opp_repo.find_by_order_id("order_cust_b_1")
+    assert opp3 is not None
+    assert opp3.customer_id != opp1.customer_id
+
+    # 4. Unresolved customer context does not collide or distort other unresolved customers
+    raw_u1, sig_u1 = make_payload(
+        "payment.failed",
+        {
+            "id": "pay_unres_01",
+            "order_id": "order_unres_01",
+            "amount": 15000,
+        },
+    )
+    res_u1 = service.process_webhook("evt_unres_01", sig_u1, raw_u1)
+    assert res_u1.status == "accepted"
+    opp_u1 = opp_repo.find_by_order_id("order_unres_01")
+    assert opp_u1 is not None
+
+    raw_u2, sig_u2 = make_payload(
+        "payment.failed",
+        {
+            "id": "pay_unres_02",
+            "order_id": "order_unres_02",
+            "amount": 15000,
+        },
+    )
+    res_u2 = service.process_webhook("evt_unres_02", sig_u2, raw_u2)
+    assert res_u2.status == "accepted"
+    opp_u2 = opp_repo.find_by_order_id("order_unres_02")
+    assert opp_u2 is not None
+
+    # Crucial: Unresolved contexts MUST NOT share the same customer ID!
+    assert opp_u1.customer_id != opp_u2.customer_id
+    assert opp_u1.customer_id != opp1.customer_id
+
+
+def test_webhook_captured_evidence_signature_integrity(session):
+    """Verify that validated webhook retains the actual HMAC signature, not a fake fallback."""
+    service = WebhookIngestionService(session, SECRET)
+    evidence_repo = PaymentEvidenceRepository(session)
+
+    raw, sig = make_payload(
+        "payment.captured",
+        {
+            "id": "pay_sig_check_01",
+            "order_id": "order_sig_check_01",
+            "amount": 50000,
+            "status": "captured",
+        },
+    )
+    res = service.process_webhook("evt_sig_check_01", sig, raw)
+    assert res.status == "accepted"
+
+    ev = evidence_repo.get_by_payment_id("pay_sig_check_01")
+    assert ev is not None
+    assert ev.signature_hash == sig
+    assert ev.signature_hash != "test_sig"
+    assert not ev.signature_hash.startswith("reconciled_")

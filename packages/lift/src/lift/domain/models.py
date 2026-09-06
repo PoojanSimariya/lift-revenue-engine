@@ -264,6 +264,8 @@ class ExecutionRecord(DomainModel):
     failure_message: str | None = None
     claimed_at: datetime = Field(default_factory=_utc_now)
     executed_at: datetime | None = None
+    task_id: UUID | None = None
+    lease_version: int | None = None
 
     @field_validator("reference_id")
     @classmethod

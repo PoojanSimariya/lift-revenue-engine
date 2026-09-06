@@ -138,3 +138,76 @@ def test_razorpay_adapter_general_gateway_error(monkeypatch):
         adapter.fetch_payment("pay_123")
     assert exc_info.value.gateway_code == "BAD_REQUEST_ERROR"
     assert "Amount exceeds maximum" in str(exc_info.value)
+
+
+def test_fetch_payment_link_by_reference_id_collection_success(monkeypatch):
+    """Verify fetch_payment_link_by_reference_id correctly parses collection response with items."""
+
+    def mock_request(method, url, **kwargs):
+        assert kwargs.get("params") == {"reference_id": "ref_found_123"}
+        return httpx.Response(
+            status_code=200,
+            json={
+                "entity": "collection",
+                "count": 1,
+                "items": [
+                    {
+                        "id": "plink_found_001",
+                        "status": "created",
+                        "amount": 25000,
+                        "currency": "INR",
+                        "amount_paid": 0,
+                        "reference_id": "ref_found_123",
+                        "short_url": "https://rzp.io/i/found",
+                        "notes": {"opp_id": "1"},
+                    }
+                ],
+            },
+        )
+
+    adapter = RazorpayTestModeAdapter(key_id="key", key_secret="secret")
+    adapter._client.request = mock_request
+
+    link = adapter.fetch_payment_link_by_reference_id("ref_found_123")
+    assert link is not None
+    assert link.id == "plink_found_001"
+    assert link.status == "created"
+    assert link.amount == 25000
+    assert link.reference_id == "ref_found_123"
+
+
+def test_fetch_payment_link_by_reference_id_collection_empty(monkeypatch):
+    """Verify fetch_payment_link_by_reference_id returns None when collection is empty."""
+
+    def mock_request(method, url, **kwargs):
+        return httpx.Response(
+            status_code=200,
+            json={
+                "entity": "collection",
+                "count": 0,
+                "items": [],
+            },
+        )
+
+    adapter = RazorpayTestModeAdapter(key_id="key", key_secret="secret")
+    adapter._client.request = mock_request
+
+    link = adapter.fetch_payment_link_by_reference_id("ref_absent_123")
+    assert link is None
+
+
+def test_fetch_payment_link_by_reference_id_malformed_raises_gateway_error(monkeypatch):
+    """Verify malformed collection response raises GatewayError safely."""
+
+    def mock_request(method, url, **kwargs):
+        return httpx.Response(
+            status_code=200,
+            json={"entity": "collection", "unexpected_payload": True},
+        )
+
+    adapter = RazorpayTestModeAdapter(key_id="key", key_secret="secret")
+    adapter._client.request = mock_request
+
+    with pytest.raises(GatewayError) as exc_info:
+        adapter.fetch_payment_link_by_reference_id("ref_malformed")
+    assert exc_info.value.gateway_code == "MALFORMED_RESPONSE"

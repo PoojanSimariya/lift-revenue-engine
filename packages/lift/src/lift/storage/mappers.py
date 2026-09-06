@@ -297,6 +297,8 @@ def to_execution_record_orm(domain: ExecutionRecord) -> ExecutionRecordORM:
         failure_message=domain.failure_message,
         claimed_at=domain.claimed_at,
         executed_at=domain.executed_at,
+        task_id=domain.task_id,
+        lease_version=domain.lease_version,
     )
 
 
@@ -313,6 +315,8 @@ def to_execution_record_domain(orm: ExecutionRecordORM) -> ExecutionRecord:
         failure_message=orm.failure_message,
         claimed_at=orm.claimed_at,
         executed_at=orm.executed_at,
+        task_id=orm.task_id,
+        lease_version=orm.lease_version,
     )
 
 

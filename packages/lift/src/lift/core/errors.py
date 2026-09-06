@@ -138,3 +138,23 @@ class GatewayResourceNotFoundError(GatewayError):
 class GatewayAuthenticationError(GatewayError):
     """Raised when gateway credentials/API keys are invalid (HTTP 401)."""
 
+
+class StaleWorkerFencedError(LiftError):
+    """Raised when a worker attempts to mutate task or execution state
+
+    with an expired or invalidated lease.
+    """
+
+    def __init__(self, task_id: Any, claimed_lease: int, current_lease: int | None = None) -> None:
+        msg = (
+            f"Task {task_id} lease_version={claimed_lease} is stale "
+            f"(current={current_lease}). Operation fenced."
+        )
+        super().__init__(
+            msg,
+            {
+                "task_id": str(task_id),
+                "claimed_lease": claimed_lease,
+                "current_lease": current_lease,
+            },
+        )

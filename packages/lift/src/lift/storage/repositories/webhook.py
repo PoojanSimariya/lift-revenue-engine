@@ -95,4 +95,3 @@ class WebhookEventRepository(BaseRepository):
         orm.processed_at = utc_now()
         self.session.flush()
         return orm
-

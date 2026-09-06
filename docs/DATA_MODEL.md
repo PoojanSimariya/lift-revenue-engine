@@ -99,7 +99,7 @@ CREATE TABLE task_queue (
     last_error TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_task_queue_poll ON task_queue(status, scheduled_at, priority DESC);
+CREATE INDEX idx_task_queue_poll ON task_queue(status, scheduled_at, priority ASC);
 ```
 
 ### 2.6 Table: `payment_attempts` (REQ-08)

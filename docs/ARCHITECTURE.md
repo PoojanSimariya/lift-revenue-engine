@@ -464,7 +464,7 @@ WITH next_task AS (
     FROM task_queue
     WHERE status = 'QUEUED'
       AND scheduled_at <= NOW()
-    ORDER BY priority DESC, scheduled_at ASC
+    ORDER BY priority ASC, scheduled_at ASC
     LIMIT 1
     FOR UPDATE SKIP LOCKED
 )

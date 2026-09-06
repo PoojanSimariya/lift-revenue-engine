@@ -1,5 +1,4 @@
-"""FastAPI router for incoming Razorpay webhooks."""
-
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request, status
@@ -10,6 +9,8 @@ from lift.config import get_settings
 from lift.core.errors import DataValidationError, InvalidSignatureError
 from lift.storage.database import create_db_engine, get_session_factory
 from lift.webhooks.service import WebhookIngestionService
+
+logger = logging.getLogger(__name__)
 
 webhook_router = APIRouter(prefix="/api/v1/webhooks", tags=["webhooks"])
 
@@ -90,9 +91,15 @@ async def ingest_razorpay_webhook(
             content={"error": "malformed_json"},
         )
     except Exception as exc:
+        logger.error(
+            "Internal error processing webhook %s: %s",
+            x_razorpay_event_id,
+            exc,
+            exc_info=True,
+        )
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"error": "internal_error", "message": str(exc)},
+            content={"error": "internal_error"},
         )
     finally:
         session.close()

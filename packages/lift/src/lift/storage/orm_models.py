@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -134,12 +135,16 @@ class TaskQueueORM(Base):
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    lease_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
 
-    __table_args__ = (Index("idx_task_queue_poll", "status", "scheduled_at", "priority"),)
+    __table_args__ = (
+        Index("idx_task_queue_poll", "status", "scheduled_at", "priority"),
+        CheckConstraint("lease_version >= 0", name="check_task_queue_lease_version_non_negative"),
+    )
 
 
 class PaymentAttemptORM(Base):
@@ -303,10 +308,15 @@ class ExecutionRecordORM(Base):
         DateTime(timezone=True), nullable=False, default=utc_now
     )
     executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    task_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("task_queue.id", ondelete="SET NULL"), nullable=True
+    )
+    lease_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     __table_args__ = (
         Index("idx_execution_idempotency", "idempotency_key"),
         Index("idx_execution_reference", "reference_id"),
+        Index("idx_execution_task_id", "task_id"),
     )
 
 

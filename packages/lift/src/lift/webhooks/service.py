@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
@@ -82,11 +84,19 @@ class WebhookIngestionService:
         self.merchant_repo = MerchantRepository(session)
         self.customer_repo = CustomerRepository(session)
 
-    def _get_or_create_default_context(
+    def _resolve_or_create_customer_context(
         self,
         merchant_id: UUID | None = None,
+        payment_entity: dict[str, Any] | None = None,
+        payment_id: str | None = None,
     ) -> tuple[Merchant, Customer]:
-        """Resolve or provision default merchant and customer for initial payment events."""
+        """Resolve or provision merchant and customer for initial payment events.
+
+        Derives stable customer identity from Razorpay customer_id, contact, or email if present.
+        If customer identity cannot be resolved from the gateway payload, isolates the unresolved
+        context using the payment identifier to avoid distorting contact fatigue across
+        unrelated customers.
+        """
         merchant = None
         if merchant_id:
             merchant = self.merchant_repo.get_by_id(merchant_id)
@@ -102,16 +112,53 @@ class WebhookIngestionService:
                 )
             )
 
-        customer = self.customer_repo.get_by_external_id(merchant.id, "cust_default_webhook")
+        external_cust_id: str
+        phone_hash: str | None = None
+        email_hash: str | None = None
+
+        if payment_entity:
+            rzp_cust_id = payment_entity.get("customer_id")
+            contact = payment_entity.get("contact")
+            email = payment_entity.get("email")
+
+            if rzp_cust_id and str(rzp_cust_id).strip():
+                external_cust_id = str(rzp_cust_id).strip()
+            elif contact and str(contact).strip():
+                phone_raw = str(contact).strip()
+                phone_hash = hashlib.sha256(phone_raw.encode("utf-8")).hexdigest()
+                external_cust_id = f"cust_contact_{phone_hash[:16]}"
+            elif email and str(email).strip():
+                email_raw = str(email).strip().lower()
+                email_hash = hashlib.sha256(email_raw.encode("utf-8")).hexdigest()
+                external_cust_id = f"cust_email_{email_hash[:16]}"
+            elif payment_id:
+                external_cust_id = f"cust_unresolved_{payment_id}"
+            else:
+                external_cust_id = f"cust_unresolved_{uuid4().hex[:12]}"
+        elif payment_id:
+            external_cust_id = f"cust_unresolved_{payment_id}"
+        else:
+            external_cust_id = "cust_default_webhook"
+
+        customer = self.customer_repo.get_by_external_id(merchant.id, external_cust_id)
         if not customer:
             customer = self.customer_repo.create(
                 Customer(
                     merchant_id=merchant.id,
-                    external_customer_id="cust_default_webhook",
+                    external_customer_id=external_cust_id,
+                    phone_hash=phone_hash,
+                    email_hash=email_hash,
                     risk_tier=1,
                 )
             )
         return merchant, customer
+
+    def _get_or_create_default_context(
+        self,
+        merchant_id: UUID | None = None,
+    ) -> tuple[Merchant, Customer]:
+        """Backward-compatible context resolution."""
+        return self._resolve_or_create_customer_context(merchant_id=merchant_id)
 
     def _parse_method(self, method_str: str | None) -> PaymentMethod:
         valid_methods = {m.value for m in PaymentMethod}
@@ -190,7 +237,11 @@ class WebhookIngestionService:
                 opp = self.opportunity_repo.find_by_order_id(order_id) if order_id else None
 
                 if opp is None:
-                    merchant, customer = self._get_or_create_default_context(merchant_id)
+                    merchant, customer = self._resolve_or_create_customer_context(
+                        merchant_id=merchant_id,
+                        payment_entity=p_entity,
+                        payment_id=payment_id,
+                    )
                     initial_opp = RecoveryOpportunity(
                         merchant_id=merchant.id,
                         customer_id=customer.id,
@@ -286,7 +337,7 @@ class WebhookIngestionService:
                                 opportunity_id=opp.id,
                                 razorpay_payment_id=payment_id,
                                 event_type="payment.captured",
-                                signature_hash=signature or "test_sig",
+                                signature_hash=signature or "unsigned_webhook",
                                 captured_amount_subunits=captured_amount,
                             )
                         )
@@ -361,9 +412,7 @@ class WebhookIngestionService:
 
             target_opp_id = str(opp.id)
             if event_type == "payment_link.paid":
-                OpportunityStateMachine.handle_payment_captured(
-                    opp, event_name="payment_link.paid"
-                )
+                OpportunityStateMachine.handle_payment_captured(opp, event_name="payment_link.paid")
                 self.opportunity_repo.update(opp)
 
                 if voucher:
@@ -379,7 +428,7 @@ class WebhookIngestionService:
                             opportunity_id=opp.id,
                             razorpay_payment_id=evidence_id,
                             event_type="payment_link.paid",
-                            signature_hash=signature or "test_sig",
+                            signature_hash=signature or "unsigned_webhook",
                             captured_amount_subunits=amt,
                         )
                     )

@@ -50,11 +50,7 @@ def make_signed_body(
 ) -> tuple[bytes, str]:
     payload = {
         "event": event_name,
-        "payload": {
-            entity_type: {
-                "entity": entity_data
-            }
-        },
+        "payload": {entity_type: {"entity": entity_data}},
     }
     raw = json.dumps(payload).encode("utf-8")
     sig = hmac.new(WEBHOOK_SECRET.encode("utf-8"), raw, hashlib.sha256).hexdigest()
@@ -149,9 +145,7 @@ def test_e2e_webhook_ingestion_lifecycle(e2e_context):
         assert att.status == AttemptStatus.CAPTURED
 
         evidence = (
-            session.query(PaymentEvidenceORM)
-            .filter_by(razorpay_payment_id="pay_e2e_001")
-            .first()
+            session.query(PaymentEvidenceORM).filter_by(razorpay_payment_id="pay_e2e_001").first()
         )
         assert evidence is not None
         assert evidence.captured_amount_subunits == 45000
@@ -240,9 +234,7 @@ def test_payment_link_reconciliation_via_reference_id(e2e_context):
         assert opp_after.current_state == OpportunityState.RECOVERED
 
         evidence = (
-            session.query(PaymentEvidenceORM)
-            .filter_by(razorpay_payment_id=link_res.id)
-            .first()
+            session.query(PaymentEvidenceORM).filter_by(razorpay_payment_id=link_res.id).first()
         )
         assert evidence is not None
         assert evidence.captured_amount_subunits == 80000
